@@ -329,7 +329,9 @@ func (*MysqlDB) GetTableNames(db *sql.DB) (tables []string) {
 			ColorLog("[ERRO] Could not show tables\n")
 			os.Exit(2)
 		}
-		tables = append(tables, name)
+		if name != "migrations" {
+			tables = append(tables, name)
+		}
 	}
 	return
 }
@@ -453,14 +455,21 @@ func (mysqlDB *MysqlDB) GetColumns(db *sql.DB, table *Table, blackList map[strin
 				refStructName := fkCol.RefTable
 				col.Name = camelCase(colName)
 				col.Type = "*" + camelCase(refStructName)
+
+				if isNullable == "YES" {
+					tag.Null = true
+				}
+
 			} else {
 				// if the name of column is Id, and it's not primary key
 				if colName == "id" {
 					col.Name = "Id_RENAME"
 				}
+
 				if isNullable == "YES" {
 					tag.Null = true
 				}
+
 				if isSQLSignedIntType(dataType) {
 					sign := extractIntSignness(columnType)
 					if sign == "unsigned" && extra != "auto_increment" {
@@ -709,7 +718,7 @@ func createPaths(mode byte, paths *MvcPath) {
 func writeSourceFiles(pkgPath string, tables []*Table, mode byte, paths *MvcPath, selectedTables map[string]bool) {
 	if (O_MODEL & mode) == O_MODEL {
 		ColorLog("[INFO] Creating model files...\n")
-		writeModelFiles(tables, paths.ModelPath, selectedTables)
+		writeModelFiles(tables, paths.ModelPath, selectedTables, pkgPath)
 	}
 	if (O_CONTROLLER & mode) == O_CONTROLLER {
 		ColorLog("[INFO] Creating controller files...\n")
@@ -722,7 +731,7 @@ func writeSourceFiles(pkgPath string, tables []*Table, mode byte, paths *MvcPath
 }
 
 // writeModelFiles generates model files
-func writeModelFiles(tables []*Table, mPath string, selectedTables map[string]bool) {
+func writeModelFiles(tables []*Table, mPath string, selectedTables map[string]bool, pkgPath string) {
 	for _, tb := range tables {
 		// if selectedTables map is not nil and this table is not selected, ignore it
 		if selectedTables != nil {
@@ -765,12 +774,22 @@ func writeModelFiles(tables []*Table, mPath string, selectedTables map[string]bo
 		// if table contains time field, import time.Time package
 		timePkg := ""
 		importTimePkg := ""
+		timestampUpdate := ""
+		timestampCreate := ""
+
 		if tb.ImportTimePkg {
 			timePkg = "\"time\"\n"
 			importTimePkg = "import \"time\"\n"
+			timestampUpdate = "m.UpdatedAt = time.Now()\nkeys = append(keys, \"UpdatedAt\")\n\n"
+			timestampCreate = "timeShortFormat := time.Now()\n\nm.CreatedAt = timeShortFormat\nm.UpdatedAt = timeShortFormat\n"
 		}
+
+		fileStr = strings.Replace(fileStr, "{{pkgPath}}", pkgPath, -1)
 		fileStr = strings.Replace(fileStr, "{{timePkg}}", timePkg, -1)
 		fileStr = strings.Replace(fileStr, "{{importTimePkg}}", importTimePkg, -1)
+		fileStr = strings.Replace(fileStr, "{{timestampUpdate}}", timestampUpdate, -1)
+		fileStr = strings.Replace(fileStr, "{{timestampCreate}}", timestampCreate, -1)
+
 		if _, err := f.WriteString(fileStr); err != nil {
 			ColorLog("[ERRO] Could not write model file to %s\n", fpath)
 			os.Exit(2)
@@ -842,7 +861,8 @@ func writeRouterFile(tables []*Table, rPath string, selectedTables map[string]bo
 			continue
 		}
 		// add name spaces
-		nameSpace := strings.Replace(NAMESPACE_TPL, "{{nameSpace}}", tb.Name, -1)
+		tb_name := strings.Replace(tb.Name, "_", "-", -1)
+		nameSpace := strings.Replace(NAMESPACE_TPL, "{{nameSpace}}", tb_name, -1)
 		nameSpace = strings.Replace(nameSpace, "{{ctrlName}}", camelCase(tb.Name), -1)
 		nameSpaces = append(nameSpaces, nameSpace)
 	}
@@ -997,9 +1017,10 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 	{{timePkg}}
+
 	"github.com/astaxie/beego/orm"
+	"{{pkgPath}}/helpers"
 )
 
 {{modelStruct}}
@@ -1015,6 +1036,8 @@ func init() {
 // Add{{modelName}} insert a new {{modelName}} into database and returns
 // last inserted Id on success.
 func Add{{modelName}}(m *{{modelName}}) (id int64, err error) {
+	{{timestampCreate}}
+	
 	o := orm.NewOrm()
 	id, err = o.Insert(m)
 	return
@@ -1023,26 +1046,30 @@ func Add{{modelName}}(m *{{modelName}}) (id int64, err error) {
 // Get{{modelName}}ById retrieves {{modelName}} by Id. Returns error if
 // Id doesn't exist
 func Get{{modelName}}ById(id int) (v *{{modelName}}, err error) {
+	var m {{modelName}}
 	o := orm.NewOrm()
-	v = &{{modelName}}{Id: id}
-	if err = o.Read(v); err == nil {
-		return v, nil
+
+	if err = o.QueryTable(new({{modelName}})).Filter("id", id).RelatedSel().One(&m); err == nil {
+		return &m, nil
 	}
+
 	return nil, err
 }
 
 // GetAll{{modelName}} retrieves all {{modelName}} matches certain condition. Returns empty list if
 // no records exist
-func GetAll{{modelName}}(query map[string]string, fields []string, sortby []string, order []string,
-	offset int64, limit int64) (ml []interface{}, err error) {
+func GetAll{{modelName}}(query map[int]map[string]string, fields []string, sortby []string, order []string,
+	offset int64, limit int64) (ml []interface{}, err error, totals int64) {
+
 	o := orm.NewOrm()
-	qs := o.QueryTable(new({{modelName}}))
-	// query k=v
-	for k, v := range query {
-		// rewrite dot-notation to Object__Attribute
-		k = strings.Replace(k, ".", "__", -1)
-		qs = qs.Filter(k, v)
+	qs := o.QueryTable(new({{modelName}})).SetCond(helpers.QueryCondition(query)).RelatedSel()
+
+	// count the current query
+	cnt, err := qs.Count()
+	if err != nil {
+		return nil, err, cnt
 	}
+
 	// order by:
 	var sortFields []string
 	if len(sortby) != 0 {
@@ -1055,7 +1082,7 @@ func GetAll{{modelName}}(query map[string]string, fields []string, sortby []stri
 				} else if order[i] == "asc" {
 					orderby = v
 				} else {
-					return nil, errors.New("Error: Invalid order. Must be either [asc|desc]")
+					return nil, errors.New("Error: Invalid order. Must be either [asc|desc]"), cnt
 				}
 				sortFields = append(sortFields, orderby)
 			}
@@ -1069,16 +1096,16 @@ func GetAll{{modelName}}(query map[string]string, fields []string, sortby []stri
 				} else if order[0] == "asc" {
 					orderby = v
 				} else {
-					return nil, errors.New("Error: Invalid order. Must be either [asc|desc]")
+					return nil, errors.New("Error: Invalid order. Must be either [asc|desc]"), cnt
 				}
 				sortFields = append(sortFields, orderby)
 			}
 		} else if len(sortby) != len(order) && len(order) != 1 {
-			return nil, errors.New("Error: 'sortby', 'order' sizes mismatch or 'order' size is not 1")
+			return nil, errors.New("Error: 'sortby', 'order' sizes mismatch or 'order' size is not 1"), cnt
 		}
 	} else {
 		if len(order) != 0 {
-			return nil, errors.New("Error: unused 'order' fields")
+			return nil, errors.New("Error: unused 'order' fields"), cnt
 		}
 	}
 
@@ -1100,22 +1127,23 @@ func GetAll{{modelName}}(query map[string]string, fields []string, sortby []stri
 				ml = append(ml, m)
 			}
 		}
-		return ml, nil
+
+		return ml, nil, cnt
 	}
-	return nil, err
+	return nil, err, cnt
 }
 
 // Update{{modelName}} updates {{modelName}} by Id and returns error if
 // the record to be updated doesn't exist
-func Update{{modelName}}ById(m *{{modelName}}) (err error) {
+func Update{{modelName}}ById(m *{{modelName}}, keys []string) (err error) {
+	{{timestampUpdate}}
+
 	o := orm.NewOrm()
 	v := {{modelName}}{Id: m.Id}
 	// ascertain id exists in the database
 	if err = o.Read(&v); err == nil {
-		var num int64
-		if num, err = o.Update(m); err == nil {
-			fmt.Println("Number of records updated in database:", num)
-		}
+		// update only the keys provided
+		o.Update(m, keys...)
 	}
 	return
 }
@@ -1138,12 +1166,11 @@ func Delete{{modelName}}(id int) (err error) {
 	CTRL_TPL = `package controllers
 
 import (
-	"{{pkgPath}}/models"
 	"encoding/json"
-	"errors"
 	"strconv"
-	"strings"
 
+	"{{pkgPath}}/models"
+	"{{pkgPath}}/helpers"
 	"github.com/astaxie/beego"
 )
 
@@ -1169,11 +1196,20 @@ func (c *{{ctrlName}}Controller) URLMapping() {
 func (c *{{ctrlName}}Controller) Post() {
 	var v models.{{ctrlName}}
 	json.Unmarshal(c.Ctx.Input.RequestBody, &v)
-	if id, err := models.Add{{ctrlName}}(&v); err == nil {
-		c.Data["json"] = map[string]int64{"id": id}
+	
+	// validate the model
+	if res, errData := helpers.Validator(&v); res == false {
+		c.Data["json"] = errData
 	} else {
-		c.Data["json"] = err.Error()
+		if id, err := models.Add{{ctrlName}}(&v); err == nil {
+			helpers.Rf.Success(c.Ctx.Request.Method, int(id))
+			c.Data["json"] = helpers.Rf.Data
+		} else {
+			helpers.Rf.Fail(err.Error())
+			c.Data["json"] = helpers.Rf.Data
+		}
 	}
+
 	c.ServeJson()
 }
 
@@ -1188,7 +1224,7 @@ func (c *{{ctrlName}}Controller) GetOne() {
 	id, _ := strconv.Atoi(idStr)
 	v, err := models.Get{{ctrlName}}ById(id)
 	if err != nil {
-		c.Data["json"] = err.Error()
+		c.Data["json"] = nil
 	} else {
 		c.Data["json"] = v
 	}
@@ -1207,60 +1243,33 @@ func (c *{{ctrlName}}Controller) GetOne() {
 // @Failure 403 
 // @router / [get]
 func (c *{{ctrlName}}Controller) GetAll() {
-	var fields []string
-	var sortby []string
-	var order []string
-	var query map[string]string = make(map[string]string)
-	var limit int64 = 10
-	var offset int64 = 0
+	
+	// Get all with query string
+	l, err, totals := models.GetAll{{ctrlName}}(helpers.QueryString(c.Input()))
 
-	// fields: col1,col2,entity.col3
-	if v := c.GetString("fields"); v != "" {
-		fields = strings.Split(v, ",")
-	}
-	// limit: 10 (default is 10)
-	if v, err := c.GetInt64("limit"); err == nil {
-		limit = v
-	}
-	// offset: 0 (default is 0)
-	if v, err := c.GetInt64("offset"); err == nil {
-		offset = v
-	}
-	// sortby: col1,col2
-	if v := c.GetString("sortby"); v != "" {
-		sortby = strings.Split(v, ",")
-	}
-	// order: desc,asc
-	if v := c.GetString("order"); v != "" {
-		order = strings.Split(v, ",")
-	}
-	// query: k:v,k:v
-	if v := c.GetString("query"); v != "" {
-		for _, cond := range strings.Split(v, ",") {
-			kv := strings.Split(cond, ":")
-			if len(kv) != 2 {
-				c.Data["json"] = errors.New("Error: invalid query key/value pair")
-				c.ServeJson()
-				return
-			}
-			k, v := kv[0], kv[1]
-			query[k] = v
+	helpers.Rf.Data = make(map[string]interface{})
+	helpers.Rf.Data["totals"] = totals
+
+	if err != nil {
+		// if error, we a nil value, same as no row found
+		c.Data["json"] = nil
+	} else {
+		if l == nil {
+			// no row found
+			c.Data["json"] = nil
+		} else {
+			helpers.Rf.Success(c.Ctx.Request.Method, 0, l)
+			c.Data["json"] = helpers.Rf.Data
 		}
 	}
 
-	l, err := models.GetAll{{ctrlName}}(query, fields, sortby, order, offset, limit)
-	if err != nil {
-		c.Data["json"] = err.Error()
-	} else {
-		c.Data["json"] = l
-	}
 	c.ServeJson()
 }
 
 // @Title Update
 // @Description update the {{ctrlName}}
-// @Param	id		path 	string	true		"The id you want to update"
-// @Param	body		body 	models.{{ctrlName}}	true		"body for {{ctrlName}} content"
+// @Param	id		path 	string				true		"The id you want to update"
+// @Param	body	body 	models.{{ctrlName}}	true		"body for {{ctrlName}} content"
 // @Success 200 {object} models.{{ctrlName}}
 // @Failure 403 :id is not int
 // @router /:id [put]
@@ -1268,11 +1277,24 @@ func (c *{{ctrlName}}Controller) Put() {
 	idStr := c.Ctx.Input.Params[":id"]
 	id, _ := strconv.Atoi(idStr)
 	v := models.{{ctrlName}}{Id: id}
+	
+	// bind input into model struct
 	json.Unmarshal(c.Ctx.Input.RequestBody, &v)
-	if err := models.Update{{ctrlName}}ById(&v); err == nil {
-		c.Data["json"] = "OK"
+	
+	// get input keys
+	keys := helpers.GetInputKeys(c.Ctx.Input.RequestBody)
+	
+	// validate the model
+	if res, errData := helpers.Validator(&v); res == false {
+		c.Data["json"] = errData
 	} else {
-		c.Data["json"] = err.Error()
+		if err := models.Update{{ctrlName}}ById(&v, keys); err == nil {
+			helpers.Rf.Success(c.Ctx.Request.Method, int(id))
+			c.Data["json"] = helpers.Rf.Data
+		} else {
+			helpers.Rf.Fail(err.Error())
+			c.Data["json"] = helpers.Rf.Data
+		}
 	}
 	c.ServeJson()
 }
@@ -1289,7 +1311,7 @@ func (c *{{ctrlName}}Controller) Delete() {
 	if err := models.Delete{{ctrlName}}(id); err == nil {
 		c.Data["json"] = "OK"
 	} else {
-		c.Data["json"] = err.Error()
+		c.Data["json"] = nil
 	}
 	c.ServeJson()
 }

@@ -29,23 +29,27 @@ var cmdMigrate = &Command{
 	UsageLine: "migrate [Command]",
 	Short:     "run database migrations",
 	Long: `
-bee migrate [-driver=mysql] [-conn="root:@tcp(127.0.0.1:3306)/test"]
+bee migrate [-database=test] [-driver=mysql] [-conn="root:@tcp(127.0.0.1:3306)/test"]
     run all outstanding migrations
+    -database: database name (default: test)
     -driver: [mysql | postgresql | sqlite] (default: mysql)
     -conn:   the connection string used by the driver, the default is root:@tcp(127.0.0.1:3306)/test
 
-bee migrate rollback [-driver=mysql] [-conn="root:@tcp(127.0.0.1:3306)/test"]
+bee migrate rollback [-database=test] [-driver=mysql] [-conn="root:@tcp(127.0.0.1:3306)/test"]
     rollback the last migration operation
+    -database: database name (default: test)
     -driver: [mysql | postgresql | sqlite] (default: mysql)
     -conn:   the connection string used by the driver, the default is root:@tcp(127.0.0.1:3306)/test
 
-bee migrate reset [-driver=mysql] [-conn="root:@tcp(127.0.0.1:3306)/test"]
+bee migrate reset  [-database=test] [-driver=mysql] [-conn="root:@tcp(127.0.0.1:3306)/test"]
     rollback all migrations
+    -database: database name (default: test)
     -driver: [mysql | postgresql | sqlite] (default: mysql)
     -conn:   the connection string used by the driver, the default is root:@tcp(127.0.0.1:3306)/test
 
-bee migrate refresh [-driver=mysql] [-conn="root:@tcp(127.0.0.1:3306)/test"]
+bee migrate refresh [-database=test] [-driver=mysql] [-conn="root:@tcp(127.0.0.1:3306)/test"]
     rollback all migrations and run them all again
+    -database: database name (default: test)
     -driver: [mysql | postgresql | sqlite] (default: mysql)
     -conn:   the connection string used by the driver, the default is root:@tcp(127.0.0.1:3306)/test
 `,
@@ -53,11 +57,13 @@ bee migrate refresh [-driver=mysql] [-conn="root:@tcp(127.0.0.1:3306)/test"]
 
 var mDriver docValue
 var mConn docValue
+var mDatabase docValue
 
 func init() {
 	cmdMigrate.Run = runMigration
 	cmdMigrate.Flag.Var(&mDriver, "driver", "database driver: mysql, postgresql, sqlite, etc.")
 	cmdMigrate.Flag.Var(&mConn, "conn", "connection string used by the driver to connect to a database instance")
+	cmdMigrate.Flag.Var(&mDatabase, "database", "specify the database want to use.")
 }
 
 // runMigration is the entry point for starting a migration
@@ -80,6 +86,12 @@ func runMigration(cmd *Command, args []string) int {
 	if len(args) != 0 {
 		cmd.Flag.Parse(args[1:])
 	}
+
+	if mDatabase != "" {
+		newConn := fmt.Sprint("root:@tcp(127.0.0.1:3306)/", mDatabase)
+		mConn = docValue(newConn)
+	}
+
 	if mDriver == "" {
 		mDriver = docValue(conf.Database.Driver)
 		if mDriver == "" {

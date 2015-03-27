@@ -47,6 +47,9 @@ the following files/directories structure:
 	├── controllers
 	│   └── object.go
 	│   └── user.go
+	├── helpers
+	│   └── global_function.go
+	│   └── response_formater.go
 	├── routers
 	│   └── router.go
 	├── tests
@@ -60,26 +63,61 @@ the following files/directories structure:
 }
 
 var apiconf = `appname = {{.Appname}}
+httpaddr = "127.0.0.1"
 httpport = 8080
-runmode = dev
+runmode = "dev"
 autorender = false
 copyrequestbody = true
 EnableDocs = true
+mysqlurls = "127.0.0.1"
+mysqluser = "dbuser"
+mysqlpass = "dbpassword"
+mysqldb   = "dbname"
 `
 var apiMaingo = `package main
 
 import (
 	_ "{{.Appname}}/docs"
 	_ "{{.Appname}}/routers"
+	"time"
 
 	"github.com/astaxie/beego"
+	"github.com/astaxie/beego/orm"
+	"github.com/astaxie/beego/plugins/cors"
+	_ "github.com/go-sql-driver/mysql"
 )
+
+func init() {
+	mysqlServer := beego.AppConfig.String("mysqlurls")
+	mysqlUser := beego.AppConfig.String("mysqluser")
+	mysqlPass := beego.AppConfig.String("mysqlpass")
+	mysqlDb := beego.AppConfig.String("mysqldb")
+
+	orm.RegisterDataBase("default", "mysql", mysqlUser+":"+mysqlPass+"@tcp("+mysqlServer+":3306)/"+mysqlDb)
+	orm.DefaultTimeLoc = time.UTC
+
+	beego.InsertFilter("*", beego.BeforeRouter, cors.Allow(&cors.Options{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "DELETE", "PUT", "PATCH", "POST"},
+		AllowHeaders:     []string{"Origin"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
+}
 
 func main() {
 	if beego.RunMode == "dev" {
 		beego.DirectoryIndex = true
 		beego.StaticDir["/swagger"] = "swagger"
+		orm.Debug = true
 	}
+	
+	if beego.RunMode == "debug" {
+		orm.Debug = true
+	}
+
+	orm.DefaultRelsDepth = 3
+
 	beego.Run()
 }
 `
@@ -500,6 +538,7 @@ func (u *UserController) Logout() {
 
 var apiTests = `package test
 
+
 import (
 	"net/http"
 	"net/http/httptest"
@@ -538,6 +577,223 @@ func TestGet(t *testing.T) {
 
 `
 
+var apiGlobalFunction = `package helpers
+
+import (
+	"encoding/json"
+	"net/url"
+	"strconv"
+	"strings"
+
+	"github.com/astaxie/beego/orm"
+	"github.com/astaxie/beego/validation"
+)
+
+// Get input keys
+func GetInputKeys(input []byte) []string {
+	// convert input into map
+	var objmap map[string]*json.RawMessage // ambil input jadikan map
+	json.Unmarshal(input, &objmap)
+
+	// get the keys
+	// ambil keys ganti jadi slice
+	keys := make([]string, 0, len(objmap))
+	for k := range objmap {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// function validator
+func Validator(model interface{}) (bool, map[string]interface{}) {
+
+	errorData := make(map[string]string)
+	valid := validation.Validation{}
+
+	passed, _ := valid.Valid(model)
+	if !passed {
+		for _, err := range valid.Errors {
+			field := strings.Split(err.Key, ".")
+			errorData[field[0]] = err.Message
+		}
+		Rf.Fail(errorData)
+		return false, Rf.Data
+	} else {
+		// disini ntar format data unutk sukses
+		return true, Rf.Data
+	}
+}
+
+func QueryString(qs url.Values) (query map[int]map[string]string, fields []string, sortby []string, order []string,
+	offset int64, limit int64) {
+
+	var cq map[string]string = make(map[string]string)
+	query = make(map[int]map[string]string)
+	limit = 10
+	offset = 0
+
+	for k, v := range qs {
+
+		// if value or maps not empty, added the value to variable
+		if v[0] != "" {
+			if k == "fields" {
+				fields = strings.Split(v[0], ",")
+			} else if k == "sortby" {
+				sortby = strings.Split(v[0], ",")
+			} else if k == "order" {
+				order = strings.Split(v[0], ",")
+			} else if k == "limit" {
+				x, _ := strconv.Atoi(v[0])
+				limit = int64(x)
+			} else if k == "offset" {
+				x, _ := strconv.Atoi(v[0])
+				offset = int64(x)
+			} else if k == "query" {
+				var index int = 0
+
+				// query string with multi condition
+				// field1:x|field2:y,Or.field2:z
+				// field1 = x and (field2=y or field2=z)
+				for _, cond := range strings.Split(v[0], "|") {
+
+					for _, partcond := range strings.Split(cond, ",") {
+						kv := strings.Split(partcond, ":")
+						if len(kv) != 2 {
+							return query, fields, sortby, order, offset, limit
+						}
+						k, val := kv[0], kv[1]
+						cq[k] = val
+					}
+
+					index = index + 1
+					query[index] = cq
+
+					// reset the map
+					cq = make(map[string]string)
+				}
+			}
+		}
+	}
+
+	return query, fields, sortby, order, offset, limit
+}
+
+func QueryCondition(query map[int]map[string]string) (cond *orm.Condition) {
+	cond = orm.NewCondition()
+	condition := orm.NewCondition()
+
+	for _, q := range query {
+		condition = orm.NewCondition()
+
+		for k, v := range q {
+			if strings.Contains(k, "And.") {
+				k = strings.Replace(k, "And.", "", -1)
+				k = strings.Replace(k, ".", "__", -1)
+
+				condition = condition.And(k, v)
+			} else if strings.Contains(k, "IsNull.") {
+				k = strings.Replace(k, "IsNull.", "", -1)
+				k = strings.Replace(k, ".", "__", -1)
+				k += "__isnull"
+
+				condition = condition.And(k, true)
+			} else if strings.Contains(k, "NotNull.") {
+				k = strings.Replace(k, "NotNull.", "", -1)
+				k = strings.Replace(k, ".", "__", -1)
+				k += "__isnull"
+
+				condition = condition.And(k, false)
+			} else if strings.Contains(k, "Ex.") {
+				k = strings.Replace(k, "Ex.", "", -1)
+				k = strings.Replace(k, ".", "__", -1)
+
+				condition = condition.AndNot(k, v)
+			} else if strings.Contains(k, "Or.") {
+				k = strings.Replace(k, "Or.", "", -1)
+				k = strings.Replace(k, ".", "__", -1)
+
+				condition = condition.Or(k, v)
+			} else if strings.Contains(k, "OrNot.") {
+				k = strings.Replace(k, "OrNot.", "", -1)
+				k = strings.Replace(k, ".", "__", -1)
+
+				condition = condition.OrNot(k, v)
+			} else if strings.Contains(k, ".in") {
+				k = strings.Replace(k, ".", "__", -1)
+				vArr := strings.Split(v, ".")
+
+				condition = condition.And(k, vArr)
+			} else {
+				k = strings.Replace(k, ".", "__", -1)
+
+				condition = condition.And(k, v)
+			}
+		}
+
+		// merge with AND
+		// @todo need make like this for OR
+		cond = cond.AndCond(condition)
+	}
+
+	return cond
+}
+`
+
+var apiResponseFormater = `package helpers
+
+import (
+	"strings"
+)
+
+type ResponseFormat struct {
+	Data map[string]interface{}
+}
+
+// global response formatter
+var (
+	Rf = ResponseFormat{}
+)
+
+func (r *ResponseFormat) Success(httpMethod string, id int, d ...[]interface{}) {
+	switch httpMethod {
+	case "POST":
+		r.Data = make(map[string]interface{})
+		r.Data["success"] = true
+		r.Data["id"] = id
+	case "GET":
+		if d != nil {
+			r.Data["data"] = d[0]
+		}
+	default:
+		r.Data = make(map[string]interface{})
+		r.Data["success"] = true
+	}
+
+}
+
+func (r *ResponseFormat) Fail(errorData interface{}) {
+	r.Data = make(map[string]interface{})
+	r.Data["success"] = false
+
+	switch errorData.(type) {
+	case string:
+		r.Data["error"] = map[string]string{
+			"orm": ClearErrorPrefix(errorData.(string)), // from orm
+		}
+	default:
+		r.Data["error"] = errorData // from validator
+	}
+}
+
+// Beego "No row" SQL error has "<QuerySetter>" prefix which is really annoying
+// remove it with this function
+func ClearErrorPrefix(s string) string {
+	strToRemove := "<QuerySeter> "
+	s = strings.TrimPrefix(s, strToRemove)
+	return s
+}
+`
+
 func init() {
 	cmdApiapp.Run = createapi
 	cmdApiapp.Flag.Var(&tables, "tables", "specify tables to generate model")
@@ -573,11 +829,21 @@ func createapi(cmd *Command, args []string) int {
 	os.Mkdir(path.Join(apppath, "docs"), 0755)
 	fmt.Println("create docs:", path.Join(apppath, "docs"))
 	os.Mkdir(path.Join(apppath, "tests"), 0755)
+	fmt.Println("create helpers:", path.Join(apppath, "helpers"))
+	os.Mkdir(path.Join(apppath, "helpers"), 0755)
 	fmt.Println("create tests:", path.Join(apppath, "tests"))
 
 	fmt.Println("create conf app.conf:", path.Join(apppath, "conf", "app.conf"))
 	writetofile(path.Join(apppath, "conf", "app.conf"),
 		strings.Replace(apiconf, "{{.Appname}}", args[0], -1))
+
+	fmt.Println("create file global_function.go:", path.Join(apppath, "helpers", "global_function.go"))
+	writetofile(path.Join(apppath, "helpers", "global_function.go"),
+		strings.Replace(apiGlobalFunction, "{{.Appname}}", args[0], -1))
+
+	fmt.Println("create file response_formater.go:", path.Join(apppath, "helpers", "response_formater.go"))
+	writetofile(path.Join(apppath, "helpers", "response_formater.go"),
+		strings.Replace(apiResponseFormater, "{{.Appname}}", args[0], -1))
 
 	if conn != "" {
 		fmt.Println("create main.go:", path.Join(apppath, "main.go"))

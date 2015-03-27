@@ -14,7 +14,10 @@
 
 package main
 
-import "os"
+import (
+	"fmt"
+	"os"
+)
 
 var cmdGenerate = &Command{
 	UsageLine: "generate [Command]",
@@ -47,8 +50,9 @@ bee generate docs
 bee generate test [routerfile]
     generate testcase
 
-bee generate appcode [-tables=""] [-driver=mysql] [-conn="root:@tcp(127.0.0.1:3306)/test"] [-level=3]
+bee generate appcode [-database=test] [-tables=""] [-driver=mysql] [-conn="root:@tcp(127.0.0.1:3306)/test"] [-level=3]
     generate appcode based on an existing database
+    -database: database name
     -tables: a list of table names separated by ',', default is empty, indicating all tables
     -driver: [mysql | postgres | sqlite], the default is mysql
     -conn:   the connection string used by the driver.
@@ -63,9 +67,11 @@ var conn docValue
 var level docValue
 var tables docValue
 var fields docValue
+var database docValue
 
 func init() {
 	cmdGenerate.Run = generateCode
+	cmdGenerate.Flag.Var(&database, "database", "specify the database want to use.")
 	cmdGenerate.Flag.Var(&tables, "tables", "specify tables to generate model")
 	cmdGenerate.Flag.Var(&driver, "driver", "database driver: mysql, postgresql, etc.")
 	cmdGenerate.Flag.Var(&conn, "conn", "connection string used by the driver to connect to a database instance")
@@ -107,6 +113,7 @@ func generateCode(cmd *Command, args []string) int {
 				driver = "mysql"
 			}
 		}
+
 		if conn == "" {
 			conn = docValue(conf.Database.Conn)
 			if conn == "" {
@@ -126,10 +133,18 @@ func generateCode(cmd *Command, args []string) int {
 	case "appcode":
 		// load config
 		err := loadConfig()
+
 		if err != nil {
 			ColorLog("[ERRO] Fail to parse bee.json[ %s ]\n", err)
 		}
+
 		cmd.Flag.Parse(args[1:])
+
+		if database != "" {
+			newConn := fmt.Sprint("root:@tcp(127.0.0.1:3306)/", database)
+			conn = docValue(newConn)
+		}
+
 		if driver == "" {
 			driver = docValue(conf.Database.Driver)
 			if driver == "" {
