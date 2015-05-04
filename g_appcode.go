@@ -262,6 +262,8 @@ func generateAppcode(driver, connStr, level, tables, currpath string) {
 		mode = O_MODEL | O_CONTROLLER
 	case "3":
 		mode = O_MODEL | O_CONTROLLER | O_ROUTER
+	case "4":
+		mode = O_ROUTER
 	default:
 		ColorLog("[ERRO] Invalid 'level' option: %s\n", level)
 		ColorLog("[HINT] Level must be either 1, 2 or 3\n")
@@ -1058,7 +1060,7 @@ func Get{{modelName}}ById(id int) (v *{{modelName}}, err error) {
 
 // GetAll{{modelName}} retrieves all {{modelName}} matches certain condition. Returns empty list if
 // no records exist
-func GetAll{{modelName}}(query map[int]map[string]string, fields []string, sortby []string, order []string,
+func GetAll{{modelName}}(query map[int]map[string]string, fields []string, groupby []string, sortby []string, order []string,
 	offset int64, limit int64) (ml []interface{}, err error, totals int64) {
 
 	o := orm.NewOrm()
@@ -1110,7 +1112,7 @@ func GetAll{{modelName}}(query map[int]map[string]string, fields []string, sortb
 	}
 
 	var l []{{modelName}}
-	qs = qs.OrderBy(sortFields...)
+	qs = qs.OrderBy(sortFields...).GroupBy(groupby...)
 	if _, err := qs.Limit(limit, offset).All(&l, fields...); err == nil {
 		if len(fields) == 0 {
 			for _, v := range l {
@@ -1235,6 +1237,7 @@ func (c *{{ctrlName}}Controller) GetOne() {
 // @Description get {{ctrlName}}
 // @Param	query	query	string	false	"Filter. e.g. col1:v1,col2:v2 ..."
 // @Param	fields	query	string	false	"Fields returned. e.g. col1,col2 ..."
+// @Param	groupby	query	string	false	"Group-by fields. e.g. col1,col2 ..."
 // @Param	sortby	query	string	false	"Sorted-by fields. e.g. col1,col2 ..."
 // @Param	order	query	string	false	"Order corresponding to each sortby field, if single value, apply to all sortby fields. e.g. desc,asc ..."
 // @Param	limit	query	string	false	"Limit the size of result set. Must be an integer"
@@ -1317,10 +1320,8 @@ func (c *{{ctrlName}}Controller) Delete() {
 }
 `
 	ROUTER_TPL = `// @APIVersion 1.0.0
-// @Title beego Test API
-// @Description beego has a very cool tools to autogenerate documents for your API
-// @Contact astaxie@gmail.com
-// @TermsOfServiceUrl http://beego.me/
+// @Title Application API
+// @Description application api
 // @License Apache 2.0
 // @LicenseUrl http://www.apache.org/licenses/LICENSE-2.0.html
 package routers
