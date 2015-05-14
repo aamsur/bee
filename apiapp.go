@@ -127,24 +127,47 @@ var apiMainconngo = `package main
 import (
 	_ "{{.Appname}}/docs"
 	_ "{{.Appname}}/routers"
+	"time"
 
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/orm"
-	{{.DriverPkg}}
+	"github.com/astaxie/beego/plugins/cors"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 func init() {
-	orm.RegisterDataBase("default", "{{.DriverName}}", "{{.conn}}")
+	mysqlServer := beego.AppConfig.String("mysqlurls")
+	mysqlUser := beego.AppConfig.String("mysqluser")
+	mysqlPass := beego.AppConfig.String("mysqlpass")
+	mysqlDb := beego.AppConfig.String("mysqldb")
+
+	orm.RegisterDataBase("default", "mysql", mysqlUser+":"+mysqlPass+"@tcp("+mysqlServer+":3306)/"+mysqlDb)
+	orm.DefaultTimeLoc = time.UTC
+
+	beego.InsertFilter("*", beego.BeforeRouter, cors.Allow(&cors.Options{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "DELETE", "PUT", "PATCH", "POST"},
+		AllowHeaders:     []string{"Origin"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
 }
 
 func main() {
 	if beego.RunMode == "dev" {
 		beego.DirectoryIndex = true
 		beego.StaticDir["/swagger"] = "swagger"
+		orm.Debug = true
 	}
+	
+	if beego.RunMode == "debug" {
+		orm.Debug = true
+	}
+
+	orm.DefaultRelsDepth = 3
+
 	beego.Run()
 }
-
 `
 
 var apirouter = `// @APIVersion 1.0.0
