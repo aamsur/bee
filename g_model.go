@@ -213,7 +213,7 @@ func GetAll{{modelName}}(query map[string]string, fields []string, sortby []stri
 				m := make(map[string]interface{})
 				val := reflect.ValueOf(v)
 				for _, fname := range fields {
-					m[fname] = val.FieldByName(fname).Interface()
+					m[fname] = val.FieldByName(helpers.CamelString(fname)).Interface()
 				}
 				ml = append(ml, m)
 			}

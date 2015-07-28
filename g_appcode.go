@@ -250,7 +250,7 @@ func (tag *OrmTag) String() string {
 	if len(ormOptions) == 0 {
 		return ""
 	}
-	return fmt.Sprintf("`orm:\"%s\"`", strings.Join(ormOptions, ";"))
+	return fmt.Sprintf("`orm:\"%s\" json:\"%s\"`", strings.Join(ormOptions, ";"), tag.Column)
 }
 
 func generateAppcode(driver, connStr, level, tables, currpath string) {
@@ -486,9 +486,10 @@ func (mysqlDB *MysqlDB) GetColumns(db *sql.DB, table *Table, blackList map[strin
 					//check auto_now, auto_now_add
 					if columnDefault == "CURRENT_TIMESTAMP" && extra == "on update CURRENT_TIMESTAMP" {
 						tag.AutoNow = true
-					} else if columnDefault == "CURRENT_TIMESTAMP" {
-						tag.AutoNowAdd = true
 					}
+					// else if columnDefault == "CURRENT_TIMESTAMP" {
+					// 	tag.AutoNowAdd = true
+					// }
 					// need to import time package
 					table.ImportTimePkg = true
 				}
@@ -776,21 +777,15 @@ func writeModelFiles(tables []*Table, mPath string, selectedTables map[string]bo
 		// if table contains time field, import time.Time package
 		timePkg := ""
 		importTimePkg := ""
-		timestampUpdate := ""
-		timestampCreate := ""
 
 		if tb.ImportTimePkg {
 			timePkg = "\"time\"\n"
 			importTimePkg = "import \"time\"\n"
-			timestampUpdate = "m.UpdatedAt = time.Now()\nkeys = append(keys, \"UpdatedAt\")\n\n"
-			timestampCreate = "timeShortFormat := time.Now()\n\nm.CreatedAt = timeShortFormat\nm.UpdatedAt = timeShortFormat\n"
 		}
 
 		fileStr = strings.Replace(fileStr, "{{pkgPath}}", pkgPath, -1)
 		fileStr = strings.Replace(fileStr, "{{timePkg}}", timePkg, -1)
 		fileStr = strings.Replace(fileStr, "{{importTimePkg}}", importTimePkg, -1)
-		fileStr = strings.Replace(fileStr, "{{timestampUpdate}}", timestampUpdate, -1)
-		fileStr = strings.Replace(fileStr, "{{timestampCreate}}", timestampCreate, -1)
 
 		if _, err := f.WriteString(fileStr); err != nil {
 			ColorLog("[ERRO] Could not write model file to %s\n", fpath)
@@ -1035,11 +1030,10 @@ func init() {
 	orm.RegisterModel(new({{modelName}}))
 }
 
+
 // Add{{modelName}} insert a new {{modelName}} into database and returns
 // last inserted Id on success.
 func Add{{modelName}}(m *{{modelName}}) (id int64, err error) {
-	{{timestampCreate}}
-	
 	o := orm.NewOrm()
 	id, err = o.Insert(m)
 	return
@@ -1124,7 +1118,7 @@ func GetAll{{modelName}}(query map[int]map[string]string, fields []string, group
 				m := make(map[string]interface{})
 				val := reflect.ValueOf(v)
 				for _, fname := range fields {
-					m[fname] = val.FieldByName(fname).Interface()
+					m[fname] = val.FieldByName(helpers.CamelString(fname)).Interface()
 				}
 				ml = append(ml, m)
 			}
@@ -1138,8 +1132,6 @@ func GetAll{{modelName}}(query map[int]map[string]string, fields []string, group
 // Update{{modelName}} updates {{modelName}} by Id and returns error if
 // the record to be updated doesn't exist
 func Update{{modelName}}ById(m *{{modelName}}, keys []string) (err error) {
-	{{timestampUpdate}}
-
 	o := orm.NewOrm()
 	v := {{modelName}}{Id: m.Id}
 	// ascertain id exists in the database
