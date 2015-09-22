@@ -72,7 +72,7 @@ EnableDocs = true
 mysqlurls = "127.0.0.1"
 mysqluser = "root"
 mysqlpass = ""
-mysqldb   = "dbname"
+mysqldb   = "{{.database}}"
 `
 var apiMaingo = `package main
 
@@ -915,9 +915,180 @@ func ClearErrorPrefix(s string) string {
 }
 `
 
+var reportControllers = `package controllers
+
+import (
+	"github.com/astaxie/beego"
+	"{{.Appname}}/helpers"
+	"{{.Appname}}/models"
+)
+
+// oprations for ReportsController
+type ReportsController struct {
+	beego.Controller
+}
+
+func (c *ReportsController) URLMapping() {
+	c.Mapping("GetReportDailySales", c.GetReportDailySales)
+	c.Mapping("GetReportDailyItemSold", c.GetReportDailyItemSold)
+	c.Mapping("GetReportItemOutofstock", c.GetReportItemOutofstock)
+	c.Mapping("GetReportItemMovements", c.GetReportItemMovements)
+	c.Mapping("GetReportDocumentStatus", c.GetReportDocumentStatus)
+}
+
+// @Title GetReportDailySales
+// @Description Get Daily Report Sales Order
+// @Success 200 {object} models.ReportDailySales
+// @Failure 403
+// @router /sales/daily [get]
+func (c *ReportsController) GetReportDailySales() {
+
+	// Get all with query string
+	l, err, totals := models.GetAllReportDailySales()
+
+	helpers.Rf.Data = make(map[string]interface{})
+	helpers.Rf.Data["totals"] = totals
+
+	if err != nil {
+		// if error, we a nil value, same as no row found
+		c.Data["json"] = nil
+	} else {
+		if l == nil {
+			// no row found
+			c.Data["json"] = nil
+		} else {
+			helpers.Rf.Success(c.Ctx.Request.Method, 0, l)
+			c.Data["json"] = helpers.Rf.Data
+		}
+	}
+
+	c.ServeJson()
+}
+
+// @Title GetReportDailyItemSold
+// @Description Get Daily Report Item Sold
+// @Success 200 {object} models.ReportDailyItemSold
+// @Failure 403
+// @router /sales-item/daily [get]
+func (c *ReportsController) GetReportDailyItemSold() {
+
+	// Get all with query string
+	l, err, totals := models.GetAllReportDailyItemSold()
+
+	helpers.Rf.Data = make(map[string]interface{})
+	helpers.Rf.Data["totals"] = totals
+
+	if err != nil {
+		// if error, we a nil value, same as no row found
+		c.Data["json"] = nil
+	} else {
+		if l == nil {
+			// no row found
+			c.Data["json"] = nil
+		} else {
+			helpers.Rf.Success(c.Ctx.Request.Method, 0, l)
+			c.Data["json"] = helpers.Rf.Data
+		}
+	}
+
+	c.ServeJson()
+}
+
+// @Title GetReportItemOutofstock
+// @Description Get 10 item lowest stock
+// @Success 200 {object} models.ReportItemOutofstock
+// @Failure 403
+// @router /items/outofstock [get]
+func (c *ReportsController) GetReportItemOutofstock() {
+
+	// Get all with query string
+	l, err, totals := models.GetAllReportItemOutofstock()
+
+	helpers.Rf.Data = make(map[string]interface{})
+	helpers.Rf.Data["totals"] = totals
+
+	if err != nil {
+		// if error, we a nil value, same as no row found
+		c.Data["json"] = nil
+	} else {
+		if l == nil {
+			// no row found
+			c.Data["json"] = nil
+		} else {
+			helpers.Rf.Success(c.Ctx.Request.Method, 0, l)
+			c.Data["json"] = helpers.Rf.Data
+		}
+	}
+
+	c.ServeJson()
+}
+
+
+// @Title GetReportItemMovements
+// @Description Get sum of item movement for this month
+// @Success 200 {object} models.ReportItemMovements
+// @Failure 403
+// @router /item/movements [get]
+func (c *ReportsController) GetReportItemMovements() {
+
+	// Get all with query string
+	l, err, totals := models.GetAllReportItemMovements()
+
+	helpers.Rf.Data = make(map[string]interface{})
+	helpers.Rf.Data["totals"] = totals
+
+	if err != nil {
+		// if error, we a nil value, same as no row found
+		c.Data["json"] = nil
+	} else {
+		if l == nil {
+			// no row found
+			c.Data["json"] = nil
+		} else {
+			helpers.Rf.Success(c.Ctx.Request.Method, 0, l)
+			c.Data["json"] = helpers.Rf.Data
+		}
+	}
+
+	c.ServeJson()
+}
+
+// @Title GetReportDocumentStatus
+// @Description Get all document status
+// @Success 200 {object} models.ReportDocumentStatus
+// @Failure 403
+// @router /document/status [get]
+func (c *ReportsController) GetReportDocumentStatus() {
+
+	// Get all with query string
+	l, err, totals := models.GetAllReportDocumentStatus()
+
+	helpers.Rf.Data = make(map[string]interface{})
+	helpers.Rf.Data["totals"] = totals
+
+	if err != nil {
+		// if error, we a nil value, same as no row found
+		c.Data["json"] = nil
+	} else {
+		if l == nil {
+			// no row found
+			c.Data["json"] = nil
+		} else {
+			helpers.Rf.Success(c.Ctx.Request.Method, 0, l)
+			c.Data["json"] = helpers.Rf.Data
+		}
+	}
+
+	c.ServeJson()
+}
+`
+
+var connection = "root:@tcp(127.0.0.1:3306)/{{.database}}"
+var default_db = "konektifa_app"
+
 func init() {
 	cmdApiapp.Run = createapi
-	// cmdApiapp.Flag.Var(&database, "database", "specify database to generate api")
+	cmdApiapp.Flag.Var(&database, "database", "specify database to generate api")
 	cmdApiapp.Flag.Var(&tables, "tables", "specify tables to generate model")
 	cmdApiapp.Flag.Var(&driver, "driver", "database driver: mysql, postgresql, etc.")
 	cmdApiapp.Flag.Var(&conn, "conn", "connection string used by the driver to connect to a database instance")
@@ -940,7 +1111,7 @@ func createapi(cmd *Command, args []string) int {
 	if driver == "" {
 		driver = "mysql"
 	}
-	if conn == "" {
+	if conn == "" {	
 	}
 	os.MkdirAll(apppath, 0755)
 	fmt.Println("create app folder:", apppath)
@@ -955,9 +1126,6 @@ func createapi(cmd *Command, args []string) int {
 	os.Mkdir(path.Join(apppath, "helpers"), 0755)
 	fmt.Println("create tests:", path.Join(apppath, "tests"))
 
-	fmt.Println("create conf app.conf:", path.Join(apppath, "conf", "app.conf"))
-	writetofile(path.Join(apppath, "conf", "app.conf"),
-		strings.Replace(apiconf, "{{.Appname}}", args[0], -1))
 
 	fmt.Println("create file global_function.go:", path.Join(apppath, "helpers", "global_function.go"))
 	writetofile(path.Join(apppath, "helpers", "global_function.go"),
@@ -967,62 +1135,46 @@ func createapi(cmd *Command, args []string) int {
 	writetofile(path.Join(apppath, "helpers", "response_formater.go"),
 		strings.Replace(apiResponseFormater, "{{.Appname}}", args[0], -1))
 
+	fmt.Println("create file reports.go:", path.Join(apppath, "controllers", "reports.go"))
+	writetofile(path.Join(apppath, "controllers", "reports.go"),
+		strings.Replace(reportControllers, "{{.Appname}}", args[0], -1))
+
 	if conn != "" {
-		fmt.Println("create main.go:", path.Join(apppath, "main.go"))
-		maingoContent := strings.Replace(apiMainconngo, "{{.Appname}}", packpath, -1)
-		maingoContent = strings.Replace(maingoContent, "{{.DriverName}}", string(driver), -1)
-		if driver == "mysql" {
-			maingoContent = strings.Replace(maingoContent, "{{.DriverPkg}}", `_ "github.com/go-sql-driver/mysql"`, -1)
-		} else if driver == "postgres" {
-			maingoContent = strings.Replace(maingoContent, "{{.DriverPkg}}", `_ "github.com/lib/pq"`, -1)
-		}
-		writetofile(path.Join(apppath, "main.go"),
-			strings.Replace(
-				maingoContent,
-				"{{.conn}}",
-				conn.String(),
-				-1,
-			),
-		)
-		ColorLog("[INFO] Using '%s' as 'driver'\n", driver)
-		ColorLog("[INFO] Using '%s' as 'conn'\n", conn)
-		ColorLog("[INFO] Using '%s' as 'tables'\n", tables)
-		generateAppcode(string(driver), string(conn), "3", string(tables), path.Join(curpath, args[0]))
+		connection = string(conn)
+	} else if database != ""{
+		default_db =  string(database)
+		connection = strings.Replace(connection, "{{.database}}", default_db, -1)
 	} else {
-		os.Mkdir(path.Join(apppath, "models"), 0755)
-		fmt.Println("create models:", path.Join(apppath, "models"))
-		os.Mkdir(path.Join(apppath, "routers"), 0755)
-		fmt.Println(path.Join(apppath, "routers") + string(path.Separator))
-
-		fmt.Println("create controllers object.go:", path.Join(apppath, "controllers", "object.go"))
-		writetofile(path.Join(apppath, "controllers", "object.go"),
-			strings.Replace(apiControllers, "{{.Appname}}", packpath, -1))
-
-		fmt.Println("create controllers user.go:", path.Join(apppath, "controllers", "user.go"))
-		writetofile(path.Join(apppath, "controllers", "user.go"),
-			strings.Replace(apiControllers2, "{{.Appname}}", packpath, -1))
-
-		fmt.Println("create tests default.go:", path.Join(apppath, "tests", "default_test.go"))
-		writetofile(path.Join(apppath, "tests", "default_test.go"),
-			strings.Replace(apiTests, "{{.Appname}}", packpath, -1))
-
-		fmt.Println("create routers router.go:", path.Join(apppath, "routers", "router.go"))
-		writetofile(path.Join(apppath, "routers", "router.go"),
-			strings.Replace(apirouter, "{{.Appname}}", packpath, -1))
-
-		fmt.Println("create models object.go:", path.Join(apppath, "models", "object.go"))
-		writetofile(path.Join(apppath, "models", "object.go"), apiModels)
-
-		fmt.Println("create models user.go:", path.Join(apppath, "models", "user.go"))
-		writetofile(path.Join(apppath, "models", "user.go"), apiModels2)
-
-		fmt.Println("create docs doc.go:", path.Join(apppath, "docs", "doc.go"))
-		writetofile(path.Join(apppath, "docs", "doc.go"), "package docs")
-
-		fmt.Println("create main.go:", path.Join(apppath, "main.go"))
-		writetofile(path.Join(apppath, "main.go"),
-			strings.Replace(apiMaingo, "{{.Appname}}", packpath, -1))
+		connection = strings.Replace(connection, "{{.database}}", args[0], -1)
 	}
+
+	ac := strings.Replace(apiconf, "{{.Appname}}", args[0], -1);
+	fmt.Println("create conf app.conf:", path.Join(apppath, "conf", "app.conf"))
+	writetofile(path.Join(apppath, "conf", "app.conf"),
+		strings.Replace(ac, "{{.database}}", string(default_db), -1))
+
+
+	fmt.Println("create main.go:", path.Join(apppath, "main.go"))
+	maingoContent := strings.Replace(apiMainconngo, "{{.Appname}}", packpath, -1)
+	maingoContent = strings.Replace(maingoContent, "{{.DriverName}}", string(driver), -1)
+	if driver == "mysql" {
+		maingoContent = strings.Replace(maingoContent, "{{.DriverPkg}}", `_ "github.com/go-sql-driver/mysql"`, -1)
+	} else if driver == "postgres" {
+		maingoContent = strings.Replace(maingoContent, "{{.DriverPkg}}", `_ "github.com/lib/pq"`, -1)
+	}
+	writetofile(path.Join(apppath, "main.go"),
+		strings.Replace(
+			maingoContent,
+			"{{.conn}}",
+			connection,
+			-1,
+		),
+	)
+	ColorLog("[INFO] Using '%s' as 'driver'\n", driver)
+	ColorLog("[INFO] Using '%s' as 'conn'\n", connection)
+	ColorLog("[INFO] Using '%s' as 'tables'\n", tables)
+	generateAppcode(string(driver), string(connection), "3", string(tables), path.Join(curpath, args[0]))
+
 	return 0
 }
 

@@ -863,6 +863,11 @@ func writeRouterFile(tables []*Table, rPath string, selectedTables map[string]bo
 		nameSpace = strings.Replace(nameSpace, "{{ctrlName}}", camelCase(tb.Name), -1)
 		nameSpaces = append(nameSpaces, nameSpace)
 	}
+
+	nameSpace := strings.Replace(NAMESPACE_TPL, "{{nameSpace}}", "reports", -1)
+	nameSpace = strings.Replace(nameSpace, "{{ctrlName}}", "Reports", -1)
+	nameSpaces = append(nameSpaces, nameSpace)
+
 	// add export controller
 	fpath := path.Join(rPath, "router.go")
 	routerStr := strings.Replace(ROUTER_TPL, "{{nameSpaces}}", strings.Join(nameSpaces, ""), 1)
@@ -1004,8 +1009,36 @@ func getPackagePath(curpath string) (packpath string) {
 
 const (
 	STRUCT_MODEL_TPL = `package models
-{{importTimePkg}}
+import (
+	{{timePkg}}
+
+	"github.com/astaxie/beego/orm"
+)
+
 {{modelStruct}}
+
+// GetAll{{modelName}} retrieves all {{modelName}}.
+// Returns empty list if no records exist
+func GetAll{{modelName}}() (ml []interface{}, err error, totals int64) {
+
+	qb, _ := orm.NewQueryBuilder("mysql")
+
+	qb.Select("*")
+	qb.From("{{tableName}}")
+
+	o := orm.NewOrm()
+	sql := qb.String()
+
+	var m []{{modelName}}
+	if _, err := o.Raw(sql).QueryRows(&m); err == nil {
+		for _, v := range m {
+			ml = append(ml, v)
+		}
+	}
+
+
+	return ml, err, totals
+}
 `
 
 	MODEL_TPL = `package models
