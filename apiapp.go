@@ -28,7 +28,7 @@ var cmdApiapp = &Command{
 	Long: `
 Create an API beego application.
 
-bee api [appname] [-tables=""] [-driver=mysql] [-conn=root:@tcp(127.0.0.1:3306)/test]
+bee api [appname] [-database=""] [-tables=""] [-driver=mysql] [-conn=root:@tcp(127.0.0.1:3306)/test]
     -tables: a list of table names separated by ',' (default is empty, indicating all tables)
     -driver: [mysql | postgres | sqlite] (default: mysql)
     -conn:   the connection string used by the driver, the default is ''
@@ -710,48 +710,102 @@ func QueryCondition(query map[int]map[string]string) (cond *orm.Condition) {
 	for _, q := range query {
 		condition = orm.NewCondition()
 
+
 		for k, v := range q {
 			if strings.Contains(k, "And.") {
 				k = strings.Replace(k, "And.", "", -1)
 				k = strings.Replace(k, ".", "__", -1)
 
-				condition = condition.And(k, v)
-			} else if strings.Contains(k, "IsNull.") {
-				k = strings.Replace(k, "IsNull.", "", -1)
-				k = strings.Replace(k, ".", "__", -1)
-				k += "__isnull"
-
-				condition = condition.And(k, true)
-			} else if strings.Contains(k, "NotNull.") {
-				k = strings.Replace(k, "NotNull.", "", -1)
-				k = strings.Replace(k, ".", "__", -1)
-				k += "__isnull"
-
-				condition = condition.And(k, false)
+				if strings.Contains(k, "__in") {
+					vArr := strings.Split(v, ".")
+					condition = condition.And(k, vArr)
+				} else if strings.Contains(k, "__between") {
+					vArr := strings.Split(v, ".")
+					condition = condition.And(k, vArr)
+				} else if strings.Contains(k, "__null") {
+					k = strings.Replace(k, "__null", "__isnull", -1)
+					condition = condition.And(k, true)
+				} else if strings.Contains(k, "__notnull") {
+					k = strings.Replace(k, "__notnull", "__isnull", -1)
+					condition = condition.And(k, false)
+				} else {
+					condition = condition.And(k, v)
+				}
 			} else if strings.Contains(k, "Ex.") {
 				k = strings.Replace(k, "Ex.", "", -1)
 				k = strings.Replace(k, ".", "__", -1)
 
-				condition = condition.AndNot(k, v)
+				if strings.Contains(k, "__in") {
+					vArr := strings.Split(v, ".")
+					condition = condition.AndNot(k, vArr)
+				} else if strings.Contains(k, "__between") {
+					vArr := strings.Split(v, ".")
+					condition = condition.AndNot(k, vArr)
+				} else if strings.Contains(k, "__null") {
+					k = strings.Replace(k, "__null", "__isnull", -1)
+					condition = condition.AndNot(k, true)
+				} else if strings.Contains(k, "__notnull") {
+					k = strings.Replace(k, "__notnull", "__isnull", -1)
+					condition = condition.AndNot(k, false)
+				} else {
+					condition = condition.AndNot(k, v)
+				}
 			} else if strings.Contains(k, "Or.") {
 				k = strings.Replace(k, "Or.", "", -1)
 				k = strings.Replace(k, ".", "__", -1)
 
-				condition = condition.Or(k, v)
+				if strings.Contains(k, "__in") {
+					vArr := strings.Split(v, ".")
+					condition = condition.Or(k, vArr)
+				} else if strings.Contains(k, "__between") {
+					vArr := strings.Split(v, ".")
+					condition = condition.Or(k, vArr)
+				} else if strings.Contains(k, "__null") {
+					k = strings.Replace(k, "__null", "__isnull", -1)
+					condition = condition.Or(k, true)
+				} else if strings.Contains(k, "__notnull") {
+					k = strings.Replace(k, "__notnull", "__isnull", -1)
+					condition = condition.Or(k, false)
+				} else {
+					condition = condition.Or(k, v)
+				}
 			} else if strings.Contains(k, "OrNot.") {
 				k = strings.Replace(k, "OrNot.", "", -1)
 				k = strings.Replace(k, ".", "__", -1)
 
-				condition = condition.OrNot(k, v)
-			} else if strings.Contains(k, ".in") {
-				k = strings.Replace(k, ".", "__", -1)
-				vArr := strings.Split(v, ".")
-
-				condition = condition.And(k, vArr)
+				if strings.Contains(k, "__in") {
+					vArr := strings.Split(v, ".")
+					condition = condition.OrNot(k, vArr)
+				} else if strings.Contains(k, "__between") {
+					vArr := strings.Split(v, ".")
+					condition = condition.OrNot(k, vArr)
+				} else if strings.Contains(k, "__null") {
+					k = strings.Replace(k, "__null", "__isnull", -1)
+					condition = condition.OrNot(k, true)
+				} else if strings.Contains(k, "__notnull") {
+					k = strings.Replace(k, "__notnull", "__isnull", -1)
+					condition = condition.OrNot(k, false)
+				} else {
+					condition = condition.OrNot(k, v)
+				}
 			} else {
 				k = strings.Replace(k, ".", "__", -1)
 
-				condition = condition.And(k, v)
+				if strings.Contains(k, "__in") {
+					vArr := strings.Split(v, ".")
+					condition = condition.And(k, vArr)
+				} else if strings.Contains(k, "__between") {
+					vArr := strings.Split(v, ".")
+					condition = condition.And(k, vArr)
+				} else if strings.Contains(k, "__null") {
+					k = strings.Replace(k, "__null", "__isnull", -1)
+					condition = condition.And(k, true)
+				} else if strings.Contains(k, "__notnull") {
+					k = strings.Replace(k, "__notnull", "__isnull", -1)
+					condition = condition.And(k, false)
+				} else {
+					condition = condition.And(k, v)
+				}
 			}
 		}
 
@@ -863,6 +917,7 @@ func ClearErrorPrefix(s string) string {
 
 func init() {
 	cmdApiapp.Run = createapi
+	// cmdApiapp.Flag.Var(&database, "database", "specify database to generate api")
 	cmdApiapp.Flag.Var(&tables, "tables", "specify tables to generate model")
 	cmdApiapp.Flag.Var(&driver, "driver", "database driver: mysql, postgresql, etc.")
 	cmdApiapp.Flag.Var(&conn, "conn", "connection string used by the driver to connect to a database instance")
