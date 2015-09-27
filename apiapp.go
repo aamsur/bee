@@ -934,6 +934,7 @@ func (c *ReportsController) URLMapping() {
 	c.Mapping("GetReportItemOutofstock", c.GetReportItemOutofstock)
 	c.Mapping("GetReportItemMovements", c.GetReportItemMovements)
 	c.Mapping("GetReportDocumentStatus", c.GetReportDocumentStatus)
+	c.Mapping("GetReportTransactionCounters", c.GetReportTransactionCounters)
 }
 
 // @Title GetReportDailySales
@@ -1062,6 +1063,36 @@ func (c *ReportsController) GetReportDocumentStatus() {
 
 	// Get all with query string
 	l, err, totals := models.GetAllReportDocumentStatus()
+
+	helpers.Rf.Data = make(map[string]interface{})
+	helpers.Rf.Data["totals"] = totals
+
+	if err != nil {
+		// if error, we a nil value, same as no row found
+		c.Data["json"] = nil
+	} else {
+		if l == nil {
+			// no row found
+			c.Data["json"] = nil
+		} else {
+			helpers.Rf.Success(c.Ctx.Request.Method, 0, l)
+			c.Data["json"] = helpers.Rf.Data
+		}
+	}
+
+	c.ServeJson()
+}
+
+
+// @Title GetReportTransactionCounters
+// @Description Get all document counter
+// @Success 200 {object} models.ReportTransactionCounters
+// @Failure 403
+// @router /transaction/counter [get]
+func (c *ReportsController) GetReportTransactionCounters() {
+
+	// Get all with query string
+	l, err, totals := models.GetAllReportTransactionCounters()
 
 	helpers.Rf.Data = make(map[string]interface{})
 	helpers.Rf.Data["totals"] = totals
