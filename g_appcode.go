@@ -1088,10 +1088,10 @@ func Get{{modelName}}ById(id int) (v *{{modelName}}, err error) {
 // GetAll{{modelName}} retrieves all {{modelName}} matches certain condition. Returns empty list if
 // no records exist
 func GetAll{{modelName}}(query map[int]map[string]string, fields []string, groupby []string, sortby []string, order []string,
-	offset int64, limit int64) (ml []interface{}, err error, totals int64) {
+	offset int64, limit int64, join []string) (ml []interface{}, err error, totals int64) {
 
 	o := orm.NewOrm()
-	qs := o.QueryTable(new({{modelName}})).SetCond(helpers.QueryCondition(query)).RelatedSel()
+	qs := o.QueryTable(new({{modelName}})).SetCond(helpers.QueryCondition(query)).RelatedSel(helpers.QueryJoin(join))
 
 	// count the current query
 	cnt, err := qs.Count()

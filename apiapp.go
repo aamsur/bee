@@ -648,7 +648,7 @@ func Validator(model interface{}) (bool, map[string]interface{}) {
 }
 
 func QueryString(qs url.Values) (query map[int]map[string]string, fields []string, groupby []string, sortby []string, order []string,
-	offset int64, limit int64) {
+	offset int64, limit int64, join []string) {
 
 	var cq map[string]string = make(map[string]string)
 	query = make(map[int]map[string]string)
@@ -661,6 +661,9 @@ func QueryString(qs url.Values) (query map[int]map[string]string, fields []strin
 		if v[0] != "" {
 			if k == "fields" {
 				fields = strings.Split(v[0], ",")
+			} else if k == "join" {
+				k := strings.Replace(v[0], ".", "__", -1)
+				join = strings.Split(k, ",")
 			} else if k == "groupby" {
 				groupby = strings.Split(v[0], ",")
 			} else if k == "sortby" {
@@ -684,7 +687,7 @@ func QueryString(qs url.Values) (query map[int]map[string]string, fields []strin
 					for _, partcond := range strings.Split(cond, ",") {
 						kv := strings.Split(partcond, ":")
 						if len(kv) != 2 {
-							return query, fields, groupby, sortby, order, offset, limit
+							return query, fields, groupby, sortby, order, offset, limit, join
 						}
 						k, val := kv[0], kv[1]
 						cq[k] = val
@@ -700,7 +703,7 @@ func QueryString(qs url.Values) (query map[int]map[string]string, fields []strin
 		}
 	}
 
-	return query, fields, groupby, sortby, order, offset, limit
+	return query, fields, groupby, sortby, order, offset, limit, join
 }
 
 func QueryCondition(query map[int]map[string]string) (cond *orm.Condition) {
@@ -815,6 +818,14 @@ func QueryCondition(query map[int]map[string]string) (cond *orm.Condition) {
 	}
 
 	return cond
+}
+
+func QueryJoin(joins []string) (field interface{}) {
+	if len(joins) > 0 {
+		return joins
+	}
+
+	return nil;
 }
 
 // snake string, XxYy to xx_yy
