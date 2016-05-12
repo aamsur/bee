@@ -1044,7 +1044,6 @@ func GetAll{{modelName}}() (ml []interface{}, err error, totals int64) {
 	MODEL_TPL = `package models
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	{{timePkg}}
@@ -1100,43 +1099,7 @@ func GetAll{{modelName}}(query map[int]map[string]string, fields []string, group
 	}
 
 	// order by:
-	var sortFields []string
-	if len(sortby) != 0 {
-		if len(sortby) == len(order) {
-			// 1) for each sort field, there is an associated order
-			for i, v := range sortby {
-				orderby := ""
-				if order[i] == "desc" {
-					orderby = "-" + v
-				} else if order[i] == "asc" {
-					orderby = v
-				} else {
-					return nil, errors.New("Error: Invalid order. Must be either [asc|desc]"), cnt
-				}
-				sortFields = append(sortFields, orderby)
-			}
-			qs = qs.OrderBy(sortFields...)
-		} else if len(sortby) != len(order) && len(order) == 1 {
-			// 2) there is exactly one order, all the sorted fields will be sorted by this order
-			for _, v := range sortby {
-				orderby := ""
-				if order[0] == "desc" {
-					orderby = "-" + v
-				} else if order[0] == "asc" {
-					orderby = v
-				} else {
-					return nil, errors.New("Error: Invalid order. Must be either [asc|desc]"), cnt
-				}
-				sortFields = append(sortFields, orderby)
-			}
-		} else if len(sortby) != len(order) && len(order) != 1 {
-			return nil, errors.New("Error: 'sortby', 'order' sizes mismatch or 'order' size is not 1"), cnt
-		}
-	} else {
-		if len(order) != 0 {
-			return nil, errors.New("Error: unused 'order' fields"), cnt
-		}
-	}
+	sortFields := helpers.SetSorting(sortby, order)
 
 	var l []{{modelName}}
 	qs = qs.OrderBy(sortFields...).GroupBy(groupby...)
@@ -1268,10 +1231,10 @@ func (c *{{ctrlName}}Controller) GetOne() {
 // @Param	limit	query	string	false	"Limit the size of result set. Must be an integer"
 // @Param	offset	query	string	false	"Start position of result set. Must be an integer"
 // @Success 200 {object} models.{{ctrlName}}
-// @Failure 403 
+// @Failure 403
 // @router / [get]
 func (c *{{ctrlName}}Controller) GetAll() {
-	
+
 	// Get all with query string
 	l, err, totals := models.GetAll{{ctrlName}}(helpers.QueryString(c.Input()))
 
@@ -1305,13 +1268,13 @@ func (c *{{ctrlName}}Controller) Put() {
 	idStr := c.Ctx.Input.Params[":id"]
 	id, _ := strconv.Atoi(idStr)
 	v := models.{{ctrlName}}{Id: id}
-	
+
 	// bind input into model struct
 	json.Unmarshal(c.Ctx.Input.RequestBody, &v)
-	
+
 	// get input keys
 	keys := helpers.GetInputKeys(c.Ctx.Input.RequestBody)
-	
+
 	// validate the model
 	if res, errData := helpers.Validator(&v); res == false {
 		c.Data["json"] = errData

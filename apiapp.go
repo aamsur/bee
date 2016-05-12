@@ -667,7 +667,8 @@ func QueryString(qs url.Values) (query map[int]map[string]string, fields []strin
 			} else if k == "groupby" {
 				groupby = strings.Split(v[0], ",")
 			} else if k == "sortby" {
-				sortby = strings.Split(v[0], ",")
+				k := strings.Replace(v[0], ".", "__", -1)
+				sortby = strings.Split(k, ",")
 			} else if k == "order" {
 				order = strings.Split(v[0], ",")
 			} else if k == "limit" {
@@ -826,6 +827,39 @@ func QueryJoin(joins []string) (field interface{}) {
 	}
 
 	return nil;
+}
+
+//
+// Set sorting for orm
+// its combine between sortby field and order case
+//
+func SetSorting(sortby []string, order []string) (sortFields []string) {
+	if len(sortby) != 0 {
+		if len(sortby) == len(order) {
+			for i, v := range sortby {
+				orderby := ""
+				if order[i] == "desc" {
+					orderby = "-" + v
+				} else {
+					orderby = v
+				}
+				sortFields = append(sortFields, orderby)
+			}
+		} else if len(sortby) != len(order) && len(order) == 1 {
+			for _, v := range sortby {
+				orderby := ""
+				if order[0] == "desc" {
+					orderby = "-" + v
+				} else {
+					orderby = v
+				}
+
+				sortFields = append(sortFields, orderby)
+			}
+		}
+	}
+
+	return
 }
 
 // snake string, XxYy to xx_yy
