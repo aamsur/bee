@@ -1090,7 +1090,7 @@ func GetAll{{modelName}}(query map[int]map[string]string, fields []string, group
 	offset int64, limit int64, join []string) (ml []interface{}, err error, totals int64) {
 
 	o := orm.NewOrm()
-	qs := o.QueryTable(new({{modelName}})).SetCond(helpers.QueryCondition(query)).RelatedSel(helpers.QueryJoin(join))
+	qs := o.QueryTable(new({{modelName}})).SetCond(helpers.QueryCondition(query)).RelatedSel(helpers.QueryJoin(join)).GroupBy(groupby...)
 
 	// count the current query
 	cnt, err := qs.Count()
@@ -1102,7 +1102,7 @@ func GetAll{{modelName}}(query map[int]map[string]string, fields []string, group
 	sortFields := helpers.SetSorting(sortby, order)
 
 	var l []{{modelName}}
-	qs = qs.OrderBy(sortFields...).GroupBy(groupby...)
+	qs = qs.OrderBy(sortFields...)
 	if _, err := qs.Limit(limit, offset).All(&l, fields...); err == nil {
 		if len(fields) == 0 {
 			for _, v := range l {
