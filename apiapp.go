@@ -93,8 +93,8 @@ func init() {
 	mysqlPass := beego.AppConfig.String("mysqlpass")
 	mysqlDb := beego.AppConfig.String("mysqldb")
 
-	orm.RegisterDataBase("default", "mysql", mysqlUser+":"+mysqlPass+"@tcp("+mysqlServer+":3306)/"+mysqlDb)
-	orm.DefaultTimeLoc = time.UTC
+	orm.RegisterDataBase("default", "mysql", mysqlUser+":"+mysqlPass+"@tcp("+mysqlServer+":3306)/"+mysqlDb + "?charset=utf8&loc=Asia%2FJakarta")
+	orm.DefaultTimeLoc = time.Local
 
 	beego.InsertFilter("*", beego.BeforeRouter, cors.Allow(&cors.Options{
 		AllowOrigins:     []string{"*"},
@@ -141,8 +141,8 @@ func init() {
 	mysqlPass := beego.AppConfig.String("mysqlpass")
 	mysqlDb := beego.AppConfig.String("mysqldb")
 
-	orm.RegisterDataBase("default", "mysql", mysqlUser+":"+mysqlPass+"@tcp("+mysqlServer+":3306)/"+mysqlDb)
-	orm.DefaultTimeLoc = time.UTC
+	orm.RegisterDataBase("default", "mysql", mysqlUser+":"+mysqlPass+"@tcp("+mysqlServer+":3306)/"+mysqlDb + "?charset=utf8&loc=Asia%2FJakarta")
+	orm.DefaultTimeLoc = time.Local
 
 	beego.InsertFilter("*", beego.BeforeRouter, cors.Allow(&cors.Options{
 		AllowOrigins:     []string{"*"},
