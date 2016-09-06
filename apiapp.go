@@ -607,6 +607,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"fmt"
 
 	"github.com/astaxie/beego/orm"
 	"github.com/astaxie/beego/validation"
@@ -687,11 +688,18 @@ func QueryString(qs url.Values) (query map[int]map[string]string, fields []strin
 
 					for _, partcond := range strings.Split(cond, ",") {
 						kv := strings.Split(partcond, ":")
-						if len(kv) != 2 {
-							return query, fields, groupby, sortby, order, offset, limit, join
+						if len(kv) > 1 {
+
+							if len(kv) > 3 {
+								kv[1] = fmt.Sprintf("%s:%s:%s", kv[1], kv[2], kv[3])
+							}
+
+
+							k, val := kv[0], kv[1]
+							cq[k] = val
+						} else {
+							cq[partcond] = "true"
 						}
-						k, val := kv[0], kv[1]
-						cq[k] = val
 					}
 
 					index = index + 1
