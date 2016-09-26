@@ -31,8 +31,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/astaxie/beego/swagger"
-	"github.com/astaxie/beego/utils"
+	"github.com/aamsur/beego/swagger"
+	"github.com/aamsur/beego/utils"
 )
 
 var globalDocsTemplate = `package docs
@@ -41,8 +41,8 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/astaxie/beego"
-	"github.com/astaxie/beego/swagger"
+	"github.com/aamsur/beego"
+	"github.com/aamsur/beego/swagger"
 )
 
 const (
@@ -263,7 +263,7 @@ func analisyscontrollerPkg(pkgpath string) {
 	}
 	pps := strings.Split(pkgpath, "/")
 	importlist[pps[len(pps)-1]] = pkgpath
-	if pkgpath == "github.com/astaxie/beego" {
+	if pkgpath == "github.com/aamsur/beego" {
 		return
 	}
 	gopath := os.Getenv("GOPATH")

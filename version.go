@@ -84,5 +84,5 @@ func getbeegoVersion() string {
 		}
 
 	}
-	return "you don't install beego,install first: github.com/astaxie/beego"
+	return "you don't install beego,install first: github.com/aamsur/beego"
 }

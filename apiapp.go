@@ -81,9 +81,9 @@ import (
 	_ "{{.Appname}}/routers"
 	"time"
 
-	"github.com/astaxie/beego"
-	"github.com/astaxie/beego/orm"
-	"github.com/astaxie/beego/plugins/cors"
+	"github.com/aamsur/beego"
+	"github.com/aamsur/beego/orm"
+	"github.com/aamsur/beego/plugins/cors"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -129,9 +129,9 @@ import (
 	_ "{{.Appname}}/routers"
 	"time"
 
-	"github.com/astaxie/beego"
-	"github.com/astaxie/beego/orm"
-	"github.com/astaxie/beego/plugins/cors"
+	"github.com/aamsur/beego"
+	"github.com/aamsur/beego/orm"
+	"github.com/aamsur/beego/plugins/cors"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -182,7 +182,7 @@ package routers
 import (
 	"{{.Appname}}/controllers"
 
-	"github.com/astaxie/beego"
+	"github.com/aamsur/beego"
 )
 
 func init() {
@@ -351,7 +351,7 @@ import (
 	"{{.Appname}}/models"
 	"encoding/json"
 
-	"github.com/astaxie/beego"
+	"github.com/aamsur/beego"
 )
 
 // Operations about object
@@ -444,7 +444,7 @@ import (
 	"{{.Appname}}/models"
 	"encoding/json"
 
-	"github.com/astaxie/beego"
+	"github.com/aamsur/beego"
 )
 
 // Operations about Users
@@ -570,7 +570,7 @@ import (
 	"path/filepath"
 	_ "{{.Appname}}/routers"
 
-	"github.com/astaxie/beego"
+	"github.com/aamsur/beego"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -609,8 +609,8 @@ import (
 	"strings"
 	"fmt"
 
-	"github.com/astaxie/beego/orm"
-	"github.com/astaxie/beego/validation"
+	"github.com/aamsur/beego/orm"
+	"github.com/aamsur/beego/validation"
 )
 
 // Get input keys
@@ -971,7 +971,7 @@ func ClearErrorPrefix(s string) string {
 var reportControllers = `package controllers
 
 import (
-	"github.com/astaxie/beego"
+	"github.com/aamsur/beego"
 	"{{.Appname}}/helpers"
 	"{{.Appname}}/models"
 )

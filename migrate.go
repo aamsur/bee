@@ -346,8 +346,8 @@ const (
 import(
 	"os"
 
-	"github.com/astaxie/beego/orm"
-	"github.com/astaxie/beego/migration"
+	"github.com/aamsur/beego/orm"
+	"github.com/aamsur/beego/migration"
 
 	_ "github.com/go-sql-driver/mysql"
 )

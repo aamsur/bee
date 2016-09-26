@@ -60,7 +60,7 @@ func generateController(cname, crupath string) {
 var controllerTpl = `package {{packageName}}
 
 import (
-	"github.com/astaxie/beego"
+	"github.com/aamsur/beego"
 )
 
 // oprations for {{controllerName}}

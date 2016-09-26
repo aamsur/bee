@@ -1012,7 +1012,7 @@ const (
 import (
 	{{timePkg}}
 
-	"github.com/astaxie/beego/orm"
+	"github.com/aamsur/beego/orm"
 )
 
 {{modelStruct}}
@@ -1048,7 +1048,7 @@ import (
 	"reflect"
 	{{timePkg}}
 
-	"github.com/astaxie/beego/orm"
+	"github.com/aamsur/beego/orm"
 	"{{pkgPath}}/helpers"
 )
 
@@ -1161,7 +1161,7 @@ import (
 
 	"{{pkgPath}}/models"
 	"{{pkgPath}}/helpers"
-	"github.com/astaxie/beego"
+	"github.com/aamsur/beego"
 )
 
 // oprations for {{ctrlName}}
@@ -1317,7 +1317,7 @@ package routers
 import (
 	"{{pkgPath}}/controllers"
 
-	"github.com/astaxie/beego"
+	"github.com/aamsur/beego"
 )
 
 func init() {
